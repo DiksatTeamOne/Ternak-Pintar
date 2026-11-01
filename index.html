@@ -157,6 +157,43 @@ h2{font-size:14px}
 </div>
 <div id="modal" hidden><div class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="cTitle"></div></div>
 
+<!-- ===== MULTIPLAYER (Firebase Realtime Database) =====
+     Isi konfigurasi di bawah (lihat panduan). Kosong = game tetap jalan dalam mode sendiri. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+<script>
+window.TP_FIREBASE={
+  apiKey:"AIzaSyBvu4mZ5oy2WOJLdY0TE9FUvCt8rSwGLMk",
+  authDomain:"ternak-pintar.firebaseapp.com",
+  databaseURL:"https://ternak-pintar-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"ternak-pintar",
+  appId:"1:506517186631:web:3790e3fdd17408cf282962"
+};
+(function(){
+  const C=window.TP_FIREBASE;
+  if((window.claude&&window.claude.use)||!C.apiKey||!C.databaseURL||typeof firebase==="undefined")return;
+  let ready=null;
+  const init=()=>ready||(ready=(async()=>{firebase.initializeApp(C);const a=firebase.auth();if(!a.currentUser)await a.signInAnonymously();return{db:firebase.database(),uid:a.currentUser.uid}})());
+  const clean=o=>JSON.parse(JSON.stringify(o));
+  const pack=d=>{const o=clean(d);o.det=JSON.stringify(d.det||[]);return o};
+  const unpack=v=>{try{if(v&&typeof v.det==="string")return{...v,det:JSON.parse(v.det)}}catch(e){}return v};
+  const room={async join(name){
+    const{db,uid}=await init(),pr=db.ref("rooms/"+name+"/peers"),me=pr.child(uid);let cur={},subs=[];
+    const h=pr.on("value",s=>{cur=s.val()||{};subs.forEach(f=>{try{f()}catch(e){}})});
+    me.onDisconnect().remove();
+    return{peers:()=>Object.keys(cur).map(k=>({peer:k,by:k,kind:"viewer",isMe:k===uid,presence:cur[k]})),
+      onPeers(f){subs.push(f);return()=>{subs=subs.filter(x=>x!==f)}},
+      presence:o=>me.update(clean(o)),
+      leave:async()=>{pr.off("value",h);subs=[];try{await me.remove()}catch(e){}}}}};
+  const dbx={collection:n=>({onSnapshot(ok,err){let off=()=>{};
+      init().then(({db})=>{const r=db.ref(n),h=r.on("value",s=>{const v=s.val()||{};ok({docs:Object.keys(v).map(id=>({id,data:()=>unpack(v[id])}))})},e=>err&&err(e));off=()=>r.off("value",h)},e=>err&&err(e));
+      return()=>off()}}),
+    doc:p=>({async set(d){const{db}=await init();await db.ref(p).set(pack(d))}})};
+  const user={id:async()=>(await init()).uid,canEdit:async()=>true};
+  window.claude={use:async n=>{try{await init()}catch(e){console.warn("Multiplayer nonaktif:",e&&e.message||e);return null}return({room,db:dbx,user})[n]||null}};
+})();
+</script>
 <script>
 "use strict";
 const AV=[{e:"🐥",n:"Anak Ayam"},{e:"🦆",n:"Bebek"},{e:"🐐",n:"Kambing"},{e:"🐑",n:"Domba"},{e:"🐄",n:"Raja Ternak"}];
