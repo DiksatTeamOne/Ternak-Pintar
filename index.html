@@ -187,7 +187,12 @@ window.TP_FIREBASE={
       return()=>off()}}),
     doc:p=>({async set(d){const{db}=await init();await db.ref(p).set(pack(d))},async delete(){const{db}=await init();await db.ref(p).remove()}})};
   const user={id:async()=>(await init()).uid,canEdit:async()=>true};
-  window.claude={use:async n=>{try{await init()}catch(e){console.warn("Multiplayer nonaktif:",e&&e.message||e);return null}return({room,db:dbx,user})[n]||null}};
+  const jk=k=>"jam/"+String(k).replace(/[.#$\[\]\/]/g,"_");
+  const clock={watch(k,ok,err){let off=()=>{};
+      init().then(({db})=>{const r=db.ref(jk(k)),h=r.on("value",s=>ok(s.val()),e=>err&&err(e));off=()=>r.off("value",h)},e=>err&&err(e));
+      return()=>off()},
+    async start(k,n){const{db}=await init();await db.ref(jk(k)).set({s:firebase.database.ServerValue.TIMESTAMP,n})}};
+  window.claude={use:async n=>{try{await init()}catch(e){console.warn("Multiplayer nonaktif:",e&&e.message||e);return null}return({room,db:dbx,user,clock})[n]||null}};
 })();
 </script>
 <script>
@@ -237,10 +242,11 @@ const spr=(e,s)=>Array.from(e).map(c=>sp(c,s)).join("");
 
 /* ---------- Kemampuan online (room, db, user, downloads). Semua opsional: tanpa itu game tetap jalan sendiri ---------- */
 const cap=n=>{try{return window.claude&&claude.use?claude.use(n).catch(()=>null):Promise.resolve(null)}catch(e){return Promise.resolve(null)}};
-let ROOM=null,DB=null,USER=null,DL=null,UID=null,ADMIN=false,RM=null,RMNAME="",offPeers=null,offDb=null;
+let ROOM=null,DB=null,USER=null,DL=null,CLK=null,UID=null,ADMIN=false,RM=null,RMNAME="",offPeers=null,offDb=null;
+let JAM=null,JAMREADY=false,JAMK="",offJam=null,lastTry=0,JAMWARN=false;
 let DBROWS=new Map(),DBSLOW=false,DBWERR=false,DIRTY=true,WQ=Promise.resolve();
 const capsP=(async()=>{
-  [ROOM,DB,USER,DL]=await Promise.all([cap("room"),cap("db"),cap("user"),cap("downloads")]);
+  [ROOM,DB,USER,DL,CLK]=await Promise.all([cap("room"),cap("db"),cap("user"),cap("downloads"),cap("clock")]);
   try{if(USER){UID=await USER.id();ADMIN=await USER.canEdit()}}catch(e){}
   updConn();if(S&&KELAS){joinRoom(KELAS);subDb()}
 })();
@@ -597,7 +603,7 @@ function saveHistory(){
   if(DB&&UID)dbHist({k:KELAS,n:S.nama,h,cy,tgl,s:S.skor,l:nDone(),d:!!S.done,w:Math.round(S.waktu||0),g:!!IAMWOLF,m:S.mati||0,det:mySnap().det})}
 const hOrd=(a,b)=>b.s-a.s||(b.d?1:0)-(a.d?1:0)||b.l-a.l||a.w-b.w||a.n.localeCompare(b.n);
 function histGroups(){
-  const g=new Map(),add=(tgl,h,row,cy)=>{const key=cy?"c"+cy:tgl+"#"+h;if(!g.has(key))g.set(key,{key,tgl,h,cy:cy||0,rows:[]});g.get(key).rows.push(row)};
+  const g=new Map(),add=(tgl,h,row,cy)=>{const key=cy?tgl+"#c"+cy:tgl+"#"+h;if(!g.has(key))g.set(key,{key,tgl,h,cy:cy||0,rows:[]});g.get(key).rows.push(row)};
   if(DB&&HROWS.size)HROWS.forEach(v=>{if(v.k===KELAS)add(v.tgl,v.h,v,v.cy)});
   else loadHist().filter(x=>x.k===KELAS).forEach(sn=>sn.rows.forEach(r=>add(sn.tgl,sn.h,r,sn.cy)));
   const G=Array.from(g.values()).sort((a,b)=>a.tgl.localeCompare(b.tgl)||(a.cy||a.h)-(b.cy||b.h)),prev=new Map();
@@ -633,12 +639,12 @@ let RESETAT=0,resetTm=0;
 function finishGame(){
   stopAudio();INHOUSE=-1;if(scene==="peta")toLobby();
   recordRank();stats();pushProfile();saveHistory();
-  RESETAT=Math.max(Date.now()+1000,Math.round((S.cyc+1)*CYC*1000-(window.TP_OFF||0)));clearInterval(resetTm);resetTm=setInterval(tickReset,250);
+  RESETAT=CLK&&JAM?Math.max(Date.now()+1000,Math.round(JAM.s+CYC*1000-(window.TP_OFF||0))):Date.now()+JEDA_HARI*1000;clearInterval(resetTm);resetTm=setInterval(tickReset,250);
   const r=rows(),mi=r.findIndex(x=>x.me);
   $("panel").dataset.k="end";
   $("panel").innerHTML=`<div class="center"><div class="big">${sp("🌙",72)}</div><h2 id="cTitle" style="padding:0">Permainan berakhir</h2>
     <p class="lead" style="margin:0 auto">Sekarang pukul 20.50, waktu bermain hari ini sudah habis. ${IAMWOLF?"Kamu bermain sebagai serigala dan gugur. ":S.done?"Kamu Raja Ternak! ":"Levelmu: "+Math.min(S.lv,5)+". "}Skor <b>${S.skor}</b>${mi>=0?" · Peringkat <b>#"+(mi+1)+"</b>":""}.</p>
-    <p class="lead" style="margin:10px auto 0">Hari baru (pukul 17.00) dimulai bersamaan untuk semua pemain dalam <b id="eCount">10</b> detik. Level dan skormu tetap tersimpan, serigala akan dipilih ulang.</p>
+    <p class="lead" style="margin:10px auto 0">Hari baru (pukul 17.00) dapat dimulai dalam <b id="eCount">10</b> detik. Pemain pertama yang berada di lobi memulainya, yang lain mengikuti. Level dan skormu tetap tersimpan, serigala akan dipilih ulang.</p>
     <div class="rk" style="justify-content:center"><button class="btn" id="eRank">Lihat peringkat</button><button class="btn alt" id="eHist">Histori</button><button class="btn alt" id="eOk">Tutup</button></div></div>`;
   openModal();$("eHist").onclick=()=>{HSEL=0;openRank("histori")};$("eRank").onclick=()=>openRank();$("eOk").onclick=closeModal;$("eRank").focus()}
 function tickReset(){
@@ -648,7 +654,7 @@ function tickReset(){
 function resetDay(){
   clearInterval(resetTm);RESETAT=0;if(!S)return;
   stopAudio();
-  S.hari=(S.hari||1)+1;S.cyc=Math.floor(wolfTime()/CYC);S.mati=0;S.jm=0;S.end=0;S.wl=null;S.wlt=null;S.wk=null;S.rt=Math.round(wolfTime()*1000);S.mx=0;S.my=0;
+  S.hari=(S.hari||1)+1;S.cyc=(JAM&&JAM.n>(S.cyc||0))?JAM.n:(S.cyc||0)+1;S.mati=0;S.jm=0;S.end=0;S.wl=null;S.wlt=null;S.wk=null;S.rt=Math.round(wolfTime()*1000);S.mx=0;S.my=0;
   WLSET=new Set();IAMWOLF=false;NOTIFY_WOLF=false;WSEEN="";INHOUSE=-1;HCD=0;HSTAY=0;SAFE=3;
   WOLVES.forEach(w=>{w.on=false});WP.clear();lastMi=-1;lastHr=-1;
   save();
@@ -828,17 +834,33 @@ function showJam(jm){
   if($("jmIc").dataset.e!==F.e){$("jmIc").dataset.e=F.e;$("jmIc").innerHTML=spr(F.e,24)}
   $("jmBar").innerHTML=[0,1,2,3].map(i=>`<i class="${m>=JM_MAX||i<f?"f":i===f?"c":""}"></i>`).join("");
   $("jamBox").setAttribute("aria-label","Jam permainan "+HM(m)+", "+F.n)}
-/* Jam bersama: satu hari permainan = CYC detik, dihitung dari jam server Firebase (atau jam perangkat bila mode sendiri).
-   Semua pemain di kelas melihat jam yang sama, dan hari baru dimulai bersamaan. */
-const clockOk=()=>window.TP_OFF!==undefined||!window.claude||performance.now()>8000;
+/* Jam bersama: pemain pertama yang masuk lobi memulai hari (waktu mulai disimpan di Firebase, jam server). Pemain lain mengikuti jam itu.
+   Hari berikutnya dimulai oleh pemain pertama yang berada di lobi setelah hari sebelumnya berakhir. Tanpa Firebase, jam berjalan sendiri. */
+function subJam(){
+  if(!CLK||!KELAS||(offJam&&JAMK===KELAS))return;
+  if(offJam){offJam();offJam=null}
+  JAMK=KELAS;JAM=null;JAMREADY=false;
+  offJam=CLK.watch(KELAS,v=>{JAM=v&&+v.s>0?{s:+v.s,n:Math.max(1,+v.n||1)}:null;JAMREADY=true},()=>{CLK=null;offJam=null})}
+function mulaiHari(){
+  if(!CLK||!JAMREADY||scene!=="lobi"||clk-lastTry<2)return;
+  if(JAM&&wolfTime()*1000<JAM.s+CYC*1000)return;
+  lastTry=clk;
+  CLK.start(KELAS,(JAM?JAM.n:0)+1).catch(e=>{
+    if(!JAMWARN){JAMWARN=true;toast("Jam bersama belum aktif: aturan Firebase untuk jam belum dipasang. Permainan memakai jam sendiri.")}
+    CLK=null})}
 function tickJam(dt){
   if(!S)return;
-  const ok=clockOk();
-  if(ok){
-    const st=wolfTime(),cy=Math.floor(st/CYC);
-    if(S.cyc==null)S.cyc=cy;
-    else if(S.cyc!==cy&&!RESETAT){resetDay();return}
-    if(S.cyc===cy)S.jm=Math.min(JM_MAX,Math.max(0,(st-cy*CYC)/DETIK_PER_MENIT))}
+  let ok=true;
+  if(CLK){
+    subJam();ok=JAMREADY;
+    if(ok){
+      mulaiHari();
+      if(!JAM)S.jm=0;
+      else{
+        if(S.cyc==null||S.cyc>JAM.n+1)S.cyc=JAM.n;
+        if(JAM.n>S.cyc&&!RESETAT){resetDay();return}
+        S.jm=JAM.n===S.cyc?Math.min(JM_MAX,Math.max(0,(wolfTime()*1000-JAM.s)/1000/DETIK_PER_MENIT)):0}}}
+  else if($("modal").hidden&&(S.jm||0)<JM_MAX)S.jm=Math.min(JM_MAX,(S.jm||0)+dt/DETIK_PER_MENIT);
   const jm=S.jm||0,mi=Math.floor(jm);
   if(mi!==lastMi){lastMi=mi;showJam(jm)}
   const hr=Math.min(4,Math.floor(jm/60));
@@ -994,7 +1016,7 @@ function toMap(){
   if(scene!=="peta"){useScene("peta");SAFE=3;me.x=S.mx>20?S.mx:190;me.y=S.my>20?S.my:240;afterScene();
     toast(S.done?"Kamu Raja Ternak! Jelajahi peternakan sesuka hati.":av().n+": cari papan pakan yang berkedip (Level "+S.lv+").")}
   else{near=nearest();stats()}}
-function enterGame(){closeModal();useScene("lobi");toLobby();joinRoom(KELAS);subDb();recordRank()}
+function enterGame(){closeModal();useScene("lobi");toLobby();joinRoom(KELAS);subDb();subJam();recordRank()}
 
 /* ---------- Modal ---------- */
 function openModal(){keys.clear();pad=[0,0];ptr=null;$("modal").hidden=false}
@@ -1033,7 +1055,7 @@ function openProfile(first){
     closeModal();stats();pushProfile();if(kc){joinRoom(KELAS);DIRTY=true}if(nameChanged||kc)recordRank(true)};
   $("nama").focus()}
 function openHelp(){stopAudio();$("panel").dataset.k="help";
-  $("panel").innerHTML=`<button class="x" id="xTop" aria-label="Tutup">X</button><h2 id="cTitle">Cara bermain</h2><ol class="how"><li>Isi nama dan kode kelas, lalu masuk lobi. Teman dengan kode yang sama ikut terlihat.</li><li>Jalan dengan panah atau WASD, atau sentuh dan tahan layar. Tekan E untuk aksi.</li><li>Dengarkan bahan simakan di papan 📻 AUDIO di lobi. Di peta tidak ada audio, kamu hanya menjawab tugas.</li><li>Masuk gerbang di lobi untuk ke peta, lalu datangi papan pakan yang berkedip.</li><li>Waktu berjalan dari pukul 17.00 (sore) sampai 20.50 (malam), lalu permainan berakhir. Jam ini sama untuk semua pemain di kelas dan terus berjalan walau kamu sedang mengerjakan tugas, lalu hari baru dimulai bersamaan. Langit, cahaya, dan suasana peta ikut berubah, jadi cari lentera dan papan yang bersinar.</li><li>Pukul 20.00 lima pemain dipilih sekali saja menjadi serigala. Serigala gugur: tidak bisa mengerjakan tugas atau mendapat poin, tugasnya memangsa. Pemain yang termangsa mati, levelnya berkurang satu, dan kembali ke lobi. Lobi aman.</li><li>Rumah, lumbung, silo, dan kandang di peta adalah rumah aman: pemain boleh masuk (tekan E di pintunya, maksimal 20 detik) tetapi serigala tidak boleh.</li><li>Susun langkah dengan menyeret atau tombol ▲▼, lalu jawab soal tambahan jika ada.</li><li>Benar: dapat poin dan hewanmu naik level. Peringkat kelas selalu terlihat di kanan atas.</li></ol>
+  $("panel").innerHTML=`<button class="x" id="xTop" aria-label="Tutup">X</button><h2 id="cTitle">Cara bermain</h2><ol class="how"><li>Isi nama dan kode kelas, lalu masuk lobi. Teman dengan kode yang sama ikut terlihat.</li><li>Jalan dengan panah atau WASD, atau sentuh dan tahan layar. Tekan E untuk aksi.</li><li>Dengarkan bahan simakan di papan 📻 AUDIO di lobi. Di peta tidak ada audio, kamu hanya menjawab tugas.</li><li>Masuk gerbang di lobi untuk ke peta, lalu datangi papan pakan yang berkedip.</li><li>Waktu berjalan dari pukul 17.00 (sore) sampai 20.50 (malam), lalu permainan berakhir. Jam dimulai oleh pemain pertama yang masuk lobi, lalu semua pemain di kelas mengikuti jam yang sama. Jam terus berjalan walau kamu sedang mengerjakan tugas. Langit, cahaya, dan suasana peta ikut berubah, jadi cari lentera dan papan yang bersinar.</li><li>Pukul 20.00 lima pemain dipilih sekali saja menjadi serigala. Serigala gugur: tidak bisa mengerjakan tugas atau mendapat poin, tugasnya memangsa. Pemain yang termangsa mati, levelnya berkurang satu, dan kembali ke lobi. Lobi aman.</li><li>Rumah, lumbung, silo, dan kandang di peta adalah rumah aman: pemain boleh masuk (tekan E di pintunya, maksimal 20 detik) tetapi serigala tidak boleh.</li><li>Susun langkah dengan menyeret atau tombol ▲▼, lalu jawab soal tambahan jika ada.</li><li>Benar: dapat poin dan hewanmu naik level. Peringkat kelas selalu terlihat di kanan atas.</li></ol>
     <h2>Jalur evolusi</h2><ul class="road">${AV.map((a,i)=>`<li>${spr(a.e,40)}<small>Lv ${i+1}</small><b>${a.n}</b></li>`).join("")}</ul>
     <button class="btn" id="okH">Mengerti</button>`;
   openModal();$("xTop").onclick=$("okH").onclick=closeModal;$("okH").focus()}
