@@ -173,7 +173,7 @@ h2{font-size:14px}
         <span class="r2"><span class="lvbar" id="prog" role="img" aria-label="Kemajuan level"></span><span>Lv <b id="stLv"></b>/5</span><span>Skor <b id="stSk"></b></span></span>
         <span class="obj" id="obj"></span>
       </button>
-      <div class="chip clk" id="jamBox" role="timer" aria-label="Jam permainan 17.00, Sore"><span id="jmIc"></span><b id="jmT">17.00</b><span id="jmP">Sore</span><span class="lvbar" id="jmBar" aria-hidden="true"></span></div>
+      <div class="chip clk" id="jamBox" role="timer" aria-label="Jam permainan 13.00, Siang"><span id="jmIc"></span><b id="jmT">13.00</b><span id="jmP">Siang</span><span class="lvbar" id="jmBar" aria-hidden="true"></span></div>
       <canvas id="mm" width="128" height="80" aria-hidden="true" hidden></canvas>
     </div>
     <div id="icons">
@@ -271,7 +271,7 @@ const ACC=["","data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rh
 const ACPL=[null,{s:13,k:"hat"},{s:13,k:"hat"},{s:13,k:"hat"},{s:11,k:"eye"},{s:11,k:"neck"},{s:7,k:"nose"},{s:11,k:"beard"}];
 const KEY="ternakPintar",RKEY="ternakPintarRank",CKEY="ternakPintarKelas";
 const MW=1600,MH=1000,MSPOTS=[[620,640],[1250,820],[1280,340],[820,222],[330,300]],LW=480,LH=320,LSPOTS=[[240,106],[96,178],[384,178],[96,262]];
-const DETIK_PER_MENIT=3,JM_MAX=230,JEDA_HARI=10,CYC=JM_MAX*DETIK_PER_MENIT+JEDA_HARI; /* 1 menit di dalam game = 3 detik nyata. Permainan berjalan 17.00 sampai 20.50 (230 menit game, sekitar 11,5 menit nyata). Ubah DETIK_PER_MENIT untuk mempercepat atau memperlambat. */
+const DETIK_PER_MENIT=4,VO=240,JM_MAX=470,JEDA_HARI=10,CYC=JM_MAX*DETIK_PER_MENIT+JEDA_HARI; /* 1 menit di dalam game = 4 detik nyata. Permainan berjalan 13.00 sampai 20.50 (470 menit game, sekitar 31 menit nyata; VO = menit game saat langit mulai sore, yaitu 17.00). Ubah DETIK_PER_MENIT untuk mempercepat atau memperlambat. */
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num=(v,a,b,d=0)=>typeof v==="number"&&isFinite(v)?Math.min(b,Math.max(a,v)):d;
@@ -672,7 +672,7 @@ function finishGame(){
   $("panel").dataset.k="end";
   $("panel").innerHTML=`<div class="center"><div class="big">${sp("🌙",72)}</div><h2 id="cTitle" style="padding:0">Permainan berakhir</h2>
     <p class="lead" style="margin:0 auto">Sekarang pukul 20.50, waktu bermain hari ini sudah habis. ${IAMWOLF?"Kamu bermain sebagai serigala dan gugur. ":S.done?"Kamu Raja Ternak! ":"Levelmu: "+Math.min(S.lv,5)+". "}Skor <b>${S.skor}</b>${mi>=0?" · Peringkat <b>#"+(mi+1)+"</b>":""}.</p>
-    <p class="lead" style="margin:10px auto 0">Hari baru (pukul 17.00) dapat dimulai dalam <b id="eCount">10</b> detik. Pemain pertama yang berada di lobi memulainya, yang lain mengikuti. Level dan skormu tetap tersimpan, serigala akan dipilih ulang.</p>
+    <p class="lead" style="margin:10px auto 0">Hari baru (pukul 13.00) dapat dimulai dalam <b id="eCount">10</b> detik. Pemain pertama yang berada di lobi memulainya, yang lain mengikuti. Level kembali ke 1, skormu tetap tersimpan, serigala akan dipilih ulang.</p>
     <div class="rk" style="justify-content:center"><button class="btn" id="eRank">Lihat peringkat</button><button class="btn alt" id="eHist">Histori</button><button class="btn alt" id="eOk">Tutup</button></div></div>`;
   openModal();$("eHist").onclick=()=>{HSEL=0;openRank("histori")};$("eRank").onclick=()=>openRank();$("eOk").onclick=closeModal;$("eRank").focus()}
 function tickReset(){
@@ -682,13 +682,13 @@ function tickReset(){
 function resetDay(){
   clearInterval(resetTm);RESETAT=0;if(!S)return;
   stopAudio();
-  S.hari=(S.hari||1)+1;S.cyc=(JAM&&JAM.n>(S.cyc||0))?JAM.n:(S.cyc||0)+1;S.mati=0;S.jm=0;S.end=0;S.wl=null;S.wlt=null;S.wk=null;S.rt=Math.round(wolfTime()*1000);S.mx=0;S.my=0;
+  S.lv=1;S.done=false;S.det=[];S.waktu=0;delete S.p1;S.hari=(S.hari||1)+1;S.cyc=(JAM&&JAM.n>(S.cyc||0))?JAM.n:(S.cyc||0)+1;S.mati=0;S.jm=0;S.end=0;S.wl=null;S.wlt=null;S.wk=null;S.rt=Math.round(wolfTime()*1000);S.mx=0;S.my=0;
   WLSET=new Set();IAMWOLF=false;NOTIFY_WOLF=false;WSEEN="";INHOUSE=-1;HCD=0;HSTAY=0;SAFE=3;
   WOLVES.forEach(w=>{w.on=false});WP.clear();lastMi=-1;lastHr=-1;
   save();
   if(!$("modal").hidden)closeModal();
   toLobby();stats();pushProfile();recordRank();DIRTY=true;
-  toast("Hari baru dimulai! Pukul 17.00, serigala belum dipilih.")}
+  toast("Hari baru dimulai! Pukul 13.00, level kembali ke 1, serigala belum dipilih.")}
 function openRadio(){
   stopAudio();C=null;$("panel").dataset.k="radio";
   $("panel").innerHTML=`<button class="x" id="xTop" aria-label="Tutup">X</button><h2 id="cTitle">${sp("📻",32)} Audio simakan</h2>
@@ -733,7 +733,7 @@ function drawRadioFx(){
   if(nearR){cx.fillStyle="#ffc83d";for(let j=0;j<5;j++)cx.fillRect(x-14+j,y-40+p*2+j,10-2*j,1)}}
 
 /* ---------- Serigala: muncul di peta saat pukul 20.00 (menit ke-180). Jika tertangkap, level turun satu dan pemain kembali ke lobi (lobi aman) ---------- */
-const WOLF_AT=180,WSP=[[1280,340],[1250,820],[900,780],[580,450],[1010,300],[330,300]];
+const WOLF_AT=420,WSP=[[1280,340],[1250,820],[900,780],[580,450],[1010,300],[330,300]];
 const CHASE_R=90,CHASE_V=68,RETURN_V=110; /* radius deteksi, kecepatan kejar (di bawah 84 milik pemain), kecepatan kembali ke jalur */
 let WSPR=null;
 function sprWolf(){const c=mk(28,24),g=c.getContext("2d"),gy=23,F=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)},C="#7d8794",D="#4f5964",H="#a9b3be";
@@ -924,7 +924,7 @@ function drawLSpot(s,i){const x=Math.round(s[0]-cam.x),y=Math.round(s[1]-cam.y),
   if(near===i){cx.fillStyle="#ffc83d";for(let j=0;j<5;j++)cx.fillRect(x-5+j,y-50+p*2+j,10-2*j,1)}}
 function drawMM(){
   if(scene!=="peta"||!S)return;const w=mm.width,h=mm.height,k=w/MW,X=v=>Math.round(v*k);
-  mx.fillStyle=rgb(tint([77,154,58],ambAt(gm()).map(v=>v*.5+127)));mx.fillRect(0,0,w,h);
+  mx.fillStyle=rgb(tint([77,154,58],ambAt(Math.max(0,gm()-VO)).map(v=>v*.5+127)));mx.fillRect(0,0,w,h);
   FIELDS.forEach((f,i)=>{mx.fillStyle=i?"#4f7a35":"#a08a3a";mx.fillRect(X(f[0]),X(f[1]),Math.max(2,X(f[2])),Math.max(2,X(f[3])))});
   mx.fillStyle="#8fae55";mx.fillRect(X(PEN[0]),X(PEN[1]),X(PEN[2]-PEN[0]),X(PEN[3]-PEN[1]));
   mx.fillStyle="#3b8fd1";mx.beginPath();mx.ellipse(POND[0]*k,POND[1]*k,POND[2]*k,POND[3]*k,0,0,7);mx.fill();
@@ -942,27 +942,27 @@ function drawMM(){
     mx.fillStyle="#2a1d3b";mx.fillText(String(i+1),x+.5,y+.5)});
   mx.strokeStyle="rgba(255,255,255,.8)";mx.lineWidth=1;mx.strokeRect(Math.round(cam.x*k)+.5,Math.round(cam.y*k)+.5,Math.round(Math.min(VW,MW)*k),Math.round(Math.min(VH,MH)*k));
   mx.fillStyle="#2a1d3b";mx.fillRect(X(me.x)-3,X(me.y)-3,7,7);mx.fillStyle=clk%.6<.3?"#fff":"#ff7aa8";mx.fillRect(X(me.x)-2,X(me.y)-2,5,5)}
-/* ---------- Jam permainan (17.00 - 21.00) dan cahaya sore ke malam ---------- */
+/* ---------- Jam permainan (13.00 - 21.00) dan cahaya sore ke malam ---------- */
 const lerp=(a,b,t)=>a+(b-a)*t,sstep=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t)};
 const rgb=a=>`rgb(${Math.round(a[0])},${Math.round(a[1])},${Math.round(a[2])})`;
 const mixC=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t)];
 const tint=(c,A)=>[c[0]*A[0]/255,c[1]*A[1]/255,c[2]*A[2]/255];
 function kf(T,m){let i=0;while(i<T.length-2&&m>T[i+1][0])i++;const a=T[i],b=T[i+1];return mixC(a[1],b[1],Math.max(0,Math.min(1,(m-a[0])/(b[0]-a[0]))))}
-/* Kunci warna per menit game: 0 = 17.00, 60 = 18.00, 120 = 19.00, 180 = 20.00, 240 = 21.00 */
+/* Kunci warna dihitung dari 17.00 (siang tetap terang sebelum itu): 0 = 17.00, 60 = 18.00, 120 = 19.00, 180 = 20.00, 240 = 21.00 */
 const AMB=[[0,[255,228,184]],[50,[255,190,120]],[90,[238,150,140]],[125,[172,132,190]],[160,[132,142,218]],[200,[118,144,232]],[240,[112,140,228]]];
 const SKYT=[[0,[104,176,232]],[50,[122,150,212]],[90,[96,88,164]],[125,[56,62,136]],[160,[40,52,132]],[200,[30,42,112]],[240,[26,38,104]]];
 const SKYH=[[0,[255,218,156]],[50,[255,164,94]],[90,[246,120,102]],[125,[176,102,150]],[160,[96,98,176]],[200,[62,80,160]],[240,[54,72,150]]];
 const ambAt=m=>kf(AMB,m).map(Math.round);
 const gm=()=>S?S.jm||0:0;
-const FASE=[{n:"Sore",e:"🌇"},{n:"Senja",e:"🌆"},{n:"Petang",e:"🌃"},{n:"Malam",e:"🌙"}];
-const JM_MSG=["","Pukul 18.00. Matahari terbenam, langit berubah jingga.","Pukul 19.00. Hari mulai gelap, lentera dinyalakan.","Pukul 20.00. Malam tiba, hewan ternak tidur. Waspada serigala, cari rumah aman!","Pukul 20.50. Permainan berakhir."];
-const HM=m=>{const t=17*60+Math.floor(m);return Math.floor(t/60)+"."+String(t%60).padStart(2,"0")};
+const FASE=[{n:"Siang",e:"☀️"},{n:"Sore",e:"🌇"},{n:"Senja",e:"🌆"},{n:"Petang",e:"🌃"},{n:"Malam",e:"🌙"}];
+const JM_MSG=["","Pukul 14.00. Siang hari, selesaikan tugas di peta.","Pukul 15.00. Matahari bersinar terang, terus kerjakan tugas.","Pukul 16.00. Hari masih terang, waktu terus berjalan.","Pukul 17.00. Sore tiba, langit mulai menguning.","Pukul 18.00. Matahari terbenam, langit berubah jingga.","Pukul 19.00. Hari mulai gelap, lentera dinyalakan.","Pukul 20.00. Malam tiba, hewan ternak tidur. Waspada serigala, cari rumah aman!"];
+const HM=m=>{const t=13*60+Math.floor(m);return Math.floor(t/60)+"."+String(t%60).padStart(2,"0")};
 let lastMi=-1,lastHr=-1,lastSave=0;
 function showJam(jm){
-  const m=Math.floor(jm),f=Math.min(3,Math.floor(m/60)),F=FASE[f];
+  const m=Math.floor(jm),f=m<VO?0:Math.min(4,1+Math.floor((m-VO)/60)),F=FASE[f];
   $("jmT").textContent=HM(m);$("jmP").textContent=F.n;
   if($("jmIc").dataset.e!==F.e){$("jmIc").dataset.e=F.e;$("jmIc").innerHTML=spr(F.e,18)}
-  $("jmBar").innerHTML=[0,1,2,3].map(i=>`<i class="${m>=JM_MAX||i<f?"f":i===f?"c":""}"></i>`).join("");
+  $("jmBar").innerHTML=[0,1,2,3,4].map(i=>`<i class="${m>=JM_MAX||i<f?"f":i===f?"c":""}"></i>`).join("");
   $("jamBox").setAttribute("aria-label","Jam permainan "+HM(m)+", "+F.n)}
 /* Jam bersama: pemain pertama yang masuk lobi memulai hari (waktu mulai disimpan di Firebase, jam server). Pemain lain mengikuti jam itu.
    Hari berikutnya dimulai oleh pemain pertama yang berada di lobi setelah hari sebelumnya berakhir. Tanpa Firebase, jam berjalan sendiri. */
@@ -993,7 +993,7 @@ function tickJam(dt){
   else if($("modal").hidden&&(S.jm||0)<JM_MAX)S.jm=Math.min(JM_MAX,(S.jm||0)+dt/DETIK_PER_MENIT);
   const jm=S.jm||0,mi=Math.floor(jm);
   if(mi!==lastMi){lastMi=mi;showJam(jm)}
-  const hr=Math.min(4,Math.floor(jm/60));
+  const hr=Math.min(7,Math.floor(jm/60));
   if(lastHr<0||hr<lastHr)lastHr=hr;
   else if(hr>lastHr){lastHr=hr;toast(JM_MSG[hr]);stats();pushProfile()}
   if(clk-lastSave>8){lastSave=clk;save()}
@@ -1020,7 +1020,7 @@ const lc=document.createElement("canvas"),lg=lc.getContext("2d");
 /* Peta cahaya: warna ambien dikalikan ke adegan, lampu ditambahkan di atasnya */
 function light(){
   if(lc.width!==VW||lc.height!==VH){lc.width=VW;lc.height=VH}
-  const jm=gm(),A=ambAt(jm),inn=scene==="lobi",nt=sstep(40,150,jm),pl=sstep(70,160,jm),sg=Math.max(0,1-jm/110),X=x=>x-cam.x,Y=y=>y-cam.y;
+  const jm=Math.max(0,gm()-VO),A=ambAt(jm),inn=scene==="lobi",nt=sstep(40,150,jm),pl=sstep(70,160,jm),sg=Math.max(0,1-jm/110),X=x=>x-cam.x,Y=y=>y-cam.y;
   let c=A;if(inn){const k=.55*sstep(30,140,jm),W=[238,210,172];c=[0,1,2].map(i=>Math.round(lerp(A[i],W[i],k)))}
   lg.globalCompositeOperation="source-over";
   if(sg>.01&&!inn){const g=lg.createLinearGradient(0,0,VW,VH*.45);g.addColorStop(0,rgb(c.map(v=>Math.min(255,v+40*sg))));g.addColorStop(1,rgb(c.map(v=>v*(1-.16*sg))));lg.fillStyle=g}else lg.fillStyle=rgb(c);
@@ -1042,7 +1042,7 @@ function light(){
 /* Jendela lobi: langit berubah dari sore ke malam (matahari, bulan, bintang) */
 function winScene(){
   if(scene!=="lobi")return;
-  const jm=gm(),A=ambAt(jm),T=kf(SKYT,jm),H=kf(SKYH,jm),st=sstep(110,175,jm);
+  const jm=Math.max(0,gm()-VO),A=ambAt(jm),T=kf(SKYT,jm),H=kf(SKYH,jm),st=sstep(110,175,jm);
   const X=x=>Math.round(x-cam.x),Y=y=>Math.round(y-cam.y);
   const R=(x,y,w,h,c)=>{cx.fillStyle=typeof c==="string"?c:rgb(c);cx.fillRect(X(x),Y(y),w,h)};
   const sky=(x,y,w,h)=>{for(let j=0;j<h;j+=3)R(x,y+j,w,Math.min(3,h-j),mixC(T,H,(j+1.5)/h))};
@@ -1193,7 +1193,7 @@ function openProfile(first){
     closeModal();stats();pushProfile();if(kc){joinRoom(KELAS);DIRTY=true}if(nameChanged||kc)recordRank(true)};
   $("nama").focus()}
 function openHelp(){stopAudio();$("panel").dataset.k="help";
-  $("panel").innerHTML=`<button class="x" id="xTop" aria-label="Tutup">X</button><h2 id="cTitle">Cara bermain</h2><ol class="how"><li>Isi nama dan kode kelas, lalu masuk lobi. Teman dengan kode yang sama ikut terlihat.</li><li>Jalan dengan panah atau WASD, atau sentuh dan tahan layar. Tekan E untuk aksi.</li><li>Dengarkan bahan simakan di papan 📻 AUDIO di lobi, atau di radio merah pada jalan awal peta (tidak bisa dipakai setelah serigala muncul pukul 20.00). Teks audio tidak ditampilkan.</li><li>Masuk gerbang di lobi untuk ke peta, lalu datangi papan pakan yang berkedip.</li><li>Waktu berjalan dari pukul 17.00 (sore) sampai 20.50 (malam), lalu permainan berakhir. Jam dimulai oleh pemain pertama yang masuk lobi, lalu semua pemain di kelas mengikuti jam yang sama. Jam terus berjalan walau kamu sedang mengerjakan tugas. Langit, cahaya, dan suasana peta ikut berubah, jadi cari lentera dan papan yang bersinar.</li><li>Pukul 20.00 sepuluh serigala muncul di peta. Mereka berjalan acak di jalan dan menuju papan tugas, jadi waspada saat mengerjakan tugas. Pemain yang termangsa mati, levelnya berkurang satu, dan kembali ke lobi. Lobi aman.</li><li>Rumah, lumbung, silo, dan kandang di peta adalah rumah aman: pemain boleh masuk (tekan E di pintunya, maksimal 20 detik) tetapi serigala tidak boleh.</li><li>Setiap level punya beberapa soal (Level 1 tiga soal pilihan ganda, Level 2 sampai 4 dua soal pilihan ganda (pilih semua yang benar) dan satu soal menyusun langkah, Level 5 satu soal menyusun langkah). Soal menyusun langkah dikerjakan dengan menyeret atau tombol ▲▼. Jika salah, tunggu 3 detik sebelum mencoba lagi.</li><li>Benar: dapat poin dan hewanmu naik level. Peringkat kelas selalu terlihat di kanan atas.</li></ol>
+  $("panel").innerHTML=`<button class="x" id="xTop" aria-label="Tutup">X</button><h2 id="cTitle">Cara bermain</h2><ol class="how"><li>Isi nama dan kode kelas, lalu masuk lobi. Teman dengan kode yang sama ikut terlihat.</li><li>Jalan dengan panah atau WASD, atau sentuh dan tahan layar. Tekan E untuk aksi.</li><li>Dengarkan bahan simakan di papan 📻 AUDIO di lobi, atau di radio merah pada jalan awal peta (tidak bisa dipakai setelah serigala muncul pukul 20.00). Teks audio tidak ditampilkan.</li><li>Masuk gerbang di lobi untuk ke peta, lalu datangi papan pakan yang berkedip.</li><li>Waktu berjalan dari pukul 13.00 (siang) sampai 20.50 (malam), lalu permainan berakhir. Jam dimulai oleh pemain pertama yang masuk lobi, lalu semua pemain di kelas mengikuti jam yang sama. Jam terus berjalan walau kamu sedang mengerjakan tugas. Langit, cahaya, dan suasana peta ikut berubah, jadi cari lentera dan papan yang bersinar.</li><li>Pukul 20.00 sepuluh serigala muncul di peta. Mereka berjalan acak di jalan dan menuju papan tugas, jadi waspada saat mengerjakan tugas. Pemain yang termangsa mati, levelnya berkurang satu, dan kembali ke lobi. Lobi aman.</li><li>Rumah, lumbung, silo, dan kandang di peta adalah rumah aman: pemain boleh masuk (tekan E di pintunya, maksimal 20 detik) tetapi serigala tidak boleh.</li><li>Setiap level punya beberapa soal (Level 1 tiga soal pilihan ganda, Level 2 sampai 4 dua soal pilihan ganda (pilih semua yang benar) dan satu soal menyusun langkah, Level 5 satu soal menyusun langkah). Soal menyusun langkah dikerjakan dengan menyeret atau tombol ▲▼. Jika salah, tunggu 3 detik sebelum mencoba lagi.</li><li>Benar: dapat poin dan hewanmu naik level. Peringkat kelas selalu terlihat di kanan atas.</li></ol>
     <h2>Jalur evolusi</h2><ul class="road">${AV.map((a,i)=>`<li>${spr(a.e,40)}<small>Lv ${i+1}</small><b>${a.n}</b></li>`).join("")}</ul>
     <button class="btn" id="okH">Mengerti</button>`;
   openModal();$("xTop").onclick=$("okH").onclick=closeModal;$("okH").focus()}
